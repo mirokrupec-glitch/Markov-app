@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Markov Quant</title>
+  <link rel="stylesheet" href="/style.css?v=20260522-5">
+</head>
+
+<body>
+
+<h2>📊 MARKOV QUANT TERMINAL</h2>
+
+<div class="topbar">
+  <input id="ticker" value="AAPL" autocomplete="off">
+  <button id="runBtn" type="button">RUN</button>
+</div>
+
+<div class="controls-row">
+  <div class="manual-links">
+    <a href="/manual-SK.html">NÁVOD SK</a>
+    <a href="/manual-EN.html">MANUAL EN</a>
+  </div>
+
+  <div class="switch-box">
+    <span>Status Window:</span>
+    <button class="statusBtn" data-days="20" type="button">20D</button>
+    <button class="statusBtn active" data-days="45" type="button">45D</button>
+    <button class="statusBtn" data-days="90" type="button">90D</button>
+  </div>
+
+  <div class="switch-box">
+    <span>Chart Range:</span>
+    <button class="chartBtn active" data-range="1Y" type="button">1Y</button>
+    <button class="chartBtn" data-range="YTD" type="button">YTD</button>
+  </div>
+</div>
+
+<div id="out"></div>
+
+<script>
+const STATES = ["Strong Bear", "Bear", "Neutral", "Bull", "Strong Bull"];
+
+let statusDays = 45;
+let chartRange = "1Y";
+
+function esc(v){
+  return String(v)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function buildClassifier(ret){
+  const sorted = [...ret].sort((a,b)=>a-b);
+
+  const q15 = sorted[Math.floor(sorted.length * 0.15)];
+  const q40 = sorted[Math.floor(sorted.length * 0.40)];
+  const q60 = sorted[Math.floor(sorted.length * 0.60)];
+  const q85 = sorted[Math.floor(sorted.length * 0.85)];
+
+  return function(r){
+    if(r < q15) return 0;
+    if(r < q40) return 1;
+    if(r < q60) return 2;
+    if(r < q85) return 3;
+    return 4;
+  };
+}
+
+function buildMatrix(seq){
+  const m = Array.from({length: 5}, () => Array(5).fill(0));
+
+  for(let i = 0; i < seq.length - 1; i++){
+    m[seq[i]][seq[i + 1]]++;
+  }
+
+  return m.map(row => {
+    const sum = row.reduce((a,b)=>a+b,0);
+    return sum ? row.map(v => v / sum) : Array(5).fill(0.2);
+  });
+}
+
+function monte(avg, vol, days){
+  const results = [];
+
+  for(let i = 0; i < 700; i++){
+    let value = 0;
+
+    for(let d = 0; d < days; d++){
+      value += avg + vol * (Math.random() - 0.5) * 2;
+    }
+
+    results.push(value);
+  }
+
+  results.sort((a,b)=>a-b);
+
+  return {
+    worst: results[Math.floor(results.length * 0.05)],
+    median: results[Math.floor(results.length * 0.50)],
+    best: results[Math.floor(results.length * 0.95)]
+  };
+}
+
+function getTrend(close, days){
+  if(close.length <= days) return 0;
+
+  const now = close[close.length - 1];
+  const past = close[close.length - 1 - days];
+
+  if(!past) return 0;
+
+  return (now - past) / past;
+}
+
+function colorSignal(signal){
+  if(signal === "BUY") return `<span class="green">BUY</span>`;
+  if(signal === "SELL") return `<span class="red">SELL</span>`;
+  if(signal === "BULLISH") return `<span class="green">BULLISH</span>`;
+  if(signal === "BEARISH") return `<span class="red">BEARISH</span>`;
+  if(signal === "HIGH") return `<span class="red">HIGH</span>`;
+  if(signal === "MEDIUM") return `<span class="yellow">MEDIUM</span>`;
+  if(signal === "LOW") return `<span class="green">LOW</span>`;
+  return `<span class="yellow">NEUTRAL</span>`;
+}
+
+function colorState(state){
+  if(state.includes("Bull")) return `<span class="green">${state}</span>`;
+  if(state.includes("Bear")) return `<span class="red">${state}</span>`;
+  return `<span class="yellow">${state}</span>`;
+}
+
+function pct(v){
+  return (v * 100).toFixed(1) + "%";
+}
+
+function pct2(v){
+  return (v * 100).toFixed(2) + "%";
+}
+
+function dec(v){
+  return v.toFixed(2);
+}
+
+function formatDate(d){
+  if(!d) return "";
+  const x = new Date(d);
+  if(Number.isNaN(x.getTime())) return "";
+  return x.toISOString().slice(0, 10);
+}
+
+function getChartSeries(close, dates, range){
+  const pairs = close.map((price, i) => ({
+    price,
+    date: dates && dates[i] ? dates[i] : null
+  })).filter(p => typeof p.price === "number" && Number.isFinite(p.price));
+
+  if(range !== "YTD" || !pairs.length || !pairs[pairs.length - 1].date){
+    return pairs;
+  }
+
+  const lastDate = new Date(pairs[pairs.length - 1].date);
+  const year = lastDate.getFullYear();
+
+  const ytdPairs = pairs.filter(p => {
+    if(!p.date) return false;
+    const d = new Date(p.date);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === year;
+  });
+
+  return ytdPairs.length >= 2 ? ytdPairs : pairs;
+}
+
+function drawChart(canvas, close, dates, range){
+  if(!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth;
+  const h = canvas.height = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const series = getChartSeries(close, dates, range);
+  const prices = series.map(p => p.price);
+
+  if(prices.length < 2){
+    ctx.fillStyle = "#888";
+    ctx.fillText("No chart data", 10, 20);
+    return;
+  }
+
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const last = prices[prices.length - 1];
+  const rangePrice = max - min || 1;
+
+  const padTop = 32;
+  const padBottom = 24;
+  const chartH = h - padTop - padBottom;
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "12px monospace";
+  ctx.fillText(`${range} PRICE CHART`, 10, 15);
+  ctx.fillText(`Min: ${min.toFixed(2)}  Max: ${max.toFixed(2)}  Last: ${last.toFixed(2)}`, 10, 30);
+
+  ctx.beginPath();
+  ctx.strokeStyle = "#22c55e";
+  ctx.lineWidth = 2;
+
+  prices.forEach((price, i) => {
+    const x = i / (prices.length - 1) * w;
+    const y = padTop + chartH - ((price - min) / rangePrice) * chartH;
+
+    if(i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+
+  ctx.stroke();
+
+  const startLabel = formatDate(series[0].date) || "Start";
+  const midLabel = formatDate(series[Math.floor(series.length / 2)].date) || "Mid";
+  const endLabel = formatDate(series[series.length - 1].date) || "Now";
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "11px monospace";
+
+  ctx.fillText(startLabel, 4, h - 6);
+
+  const midWidth = ctx.measureText(midLabel).width;
+  ctx.fillText(midLabel, Math.max(0, (w - midWidth) / 2), h - 6);
+
+  const endWidth = ctx.measureText(endLabel).width;
+  ctx.fillText(endLabel, Math.max(0, w - endWidth - 4), h - 6);
+}
+
+function getTrendSignal(trend20, trend60){
+  if(trend20 > 0.03 && trend60 > 0.06) return "BULLISH";
+  if(trend20 < -0.03 && trend60 < -0.06) return "BEARISH";
+
+  if(trend20 > 0.01 && trend60 > 0.02) return "BULLISH";
+  if(trend20 < -0.01 && trend60 < -0.02) return "BEARISH";
+
+  return "NEUTRAL";
+}
+
+function getRiskLevel(crashRisk, vol){
+  if(crashRisk > 0.14 || vol > 0.04) return "HIGH";
+  if(crashRisk > 0.08 || vol > 0.025) return "MEDIUM";
+  return "LOW";
+}
+
+function getReason(markovSignal, trendSignal, riskLevel){
+  if(markovSignal === "BUY" && trendSignal === "BULLISH" && riskLevel !== "HIGH"){
+    return "Markov model aj trend sú pozitívne.";
+  }
+
+  if(markovSignal === "SELL" && trendSignal === "BEARISH"){
+    return "Markov model aj trend sú negatívne.";
+  }
+
+  if(markovSignal === "BUY" && trendSignal === "BEARISH"){
+    return "Markov je pozitívny, ale trend je proti signálu.";
+  }
+
+  if(markovSignal === "SELL" && trendSignal === "BULLISH"){
+    return "Markov je negatívny, ale trend je proti signálu.";
+  }
+
+  if(riskLevel === "HIGH"){
+    return "Riziko je vysoké, signál je znížený.";
+  }
+
+  return "Modely nedávajú jednoznačný smer.";
+}
+
+function buildMatrixHTML(P, current){
+  const header =
+    `<div class="matrix-corner"></div>` +
+    STATES.map(state => `<div class="matrix-head">${state}</div>`).join("");
+
+  const body = P.map((row, rowIndex) => {
+    const activeClass = rowIndex === current ? " matrix-row-active" : "";
+
+    const rowLabel = `
+      <div class="matrix-row-label${activeClass}">
+        ${STATES[rowIndex]}
+      </div>
+    `;
+
+    const cells = row.map(v => {
+      return `
+        <div class="matrix-cell${activeClass}">
+          ${Math.round(v * 100)}%
+        </div>
+      `;
+    }).join("");
+
+    return rowLabel + cells;
+  }).join("");
+
+  return header + body;
+}
+
+async function run(){
+  const tickerInput = document.getElementById("ticker");
+  const runBtn = document.getElementById("runBtn");
+  const out = document.getElementById("out");
+
+  const ticker = tickerInput.value.trim().toUpperCase();
+
+  if(!ticker){
+    out.innerHTML = `<div class="box red">❌ Enter ticker</div>`;
+    return;
+  }
+
+  runBtn.disabled = true;
+  runBtn.textContent = "LOADING...";
+  out.innerHTML = `<div class="box">Loading...</div>`;
+
+  try{
+    const res = await
