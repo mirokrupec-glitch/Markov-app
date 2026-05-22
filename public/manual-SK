@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARKOV QUANT TERMINAL — Návod</title>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #0b0f14;
+      --panel2: #111827;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --blue: #60a5fa;
+      --orange: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: monospace;
+      line-height: 1.62;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .nav a {
+      display: inline-block;
+      margin: 0 0 6px 6px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .nav a:hover {
+      background: #1f2937;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      color: var(--orange);
+      letter-spacing: 1px;
+    }
+
+    h2 {
+      margin: 24px 0 10px;
+      padding-bottom: 6px;
+      color: var(--blue);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 14px;
+      margin: 14px 0;
+    }
+
+    .notice {
+      border: 1px solid var(--orange);
+      background: #18110a;
+      padding: 12px;
+      margin: 14px 0;
+    }
+
+    code,
+    pre {
+      background: var(--panel2);
+      border: 1px solid #1f2937;
+      color: var(--text);
+    }
+
+    code {
+      padding: 2px 5px;
+    }
+
+    pre {
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    ol {
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    .footer {
+      margin-top: 30px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 12px;
+      }
+
+      .top {
+        display: block;
+      }
+
+      .nav a {
+        margin: 6px 6px 0 0;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>MARKOV QUANT TERMINAL — Návod</h1>
+        <div class="muted">Slovenská verzia manuálu</div>
+      </div>
+
+      <div class="nav">
+        <a href="/">Terminal</a>
+        <a href="/manual-EN.html">EN</a>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>Disclaimer:</strong> Tento dokument vysvetľuje edukačný model. Výstup modelu nie je investičné odporúčanie.
+    </div>
+
+    <div class="card">
+      <h2>Obsah</h2>
+      <ol>
+        <li><a href="#s1">Účel aplikácie</a></li>
+        <li><a href="#s2">Vstupné dáta</a></li>
+        <li><a href="#s3">Denný výnos</a></li>
+        <li><a href="#s4">Markov stavy</a></li>
+        <li><a href="#s5">Markov matica</a></li>
+        <li><a href="#s6">Aktuálny Markov stav</a></li>
+        <li><a href="#s7">Markov Signal</a></li>
+        <li><a href="#s8">Trend Model</a></li>
+        <li><a href="#s9">Combined Model</a></li>
+        <li><a href="#s10">Trendový príspevok do skóre</a></li>
+        <li><a href="#s11">Riziková úprava skóre</a></li>
+        <li><a href="#s12">Combined Signal</a></li>
+        <li><a href="#s13">Final Decision</a></li>
+        <li><a href="#s14">Risk Panel</a></li>
+        <li><a href="#s15">Crash Risk</a></li>
+        <li><a href="#s16">Volatility</a></li>
+        <li><a href="#s17">Risk Level</a></li>
+        <li><a href="#s18">Confidence</a></li>
+        <li><a href="#s19">Trend Strength</a></li>
+        <li><a href="#s20">Win Probability</a></li>
+        <li><a href="#s21">Monte Carlo simulácia</a></li>
+        <li><a href="#s22">Price Chart</a></li>
+        <li><a href="#s23">Markov Matrix</a></li>
+        <li><a href="#s24">Disclaimer</a></li>
+      </ol>
+    </div>
+
+    <section class="card" id="s1">
+      <h2>1. Účel aplikácie</h2>
+      <p>
+        Markov Quant Terminal je edukačný analytický nástroj, ktorý používa historické denné ceny akcie
+        na odhad trhového stavu, trendu, rizika a možného smeru pohybu.
+        Model kombinuje Markov model, trendový model, kombinované skóre, rizikový panel,
+        Monte Carlo simuláciu a cenový graf.
+      </p>
+    </section>
+
+    <section class="card" id="s2">
+      <h2>2. Vstupné dáta</h2>
+      <p>
+        Aplikácia používa denné zatváracie ceny akcie.
+        Premenná <code>close[t]</code> znamená zatváraciu cenu v deň <code>t</code>.
+      </p>
+    </section>
+
+    <section class="card" id="s3">
+      <h2>3. Denný výnos</h2>
+      <p>Zatváracie ceny sa prepočítajú na denné percentuálne výnosy.</p>
+      <pre>return[t] = (close[t] - close[t-1]) / close[t-1]</pre>
+      <p>
+        Ak bola cena včera 100 a dnes 103, denný výnos je:
+      </p>
+      <pre>(103 - 100) / 100 = 0.03 = 3 %</pre>
+    </section>
+
+    <section class="card" id="s4">
+      <h2>4. Markov stavy</h2>
+      <p>Denné výnosy sa rozdelia do piatich stavov:</p>
+      <pre>0 = Strong Bear
+1 = Bear
+2 = Neutral
+3 = Bull
+4 = Strong Bull</pre>
+
+      <p>Model používa kvantily historických výnosov:</p>
+      <pre>q15 = 15. percentil
+q40 = 40. percentil
+q60 = 60. percentil
+q85 = 85. percentil</pre>
+
+      <p>Klasifikácia výnosu:</p>
+      <pre>ak return &lt; q15  =&gt; Strong Bear
+ak return &lt; q40  =&gt; Bear
+ak return &lt; q60  =&gt; Neutral
+ak return &lt; q85  =&gt; Bull
+inak             =&gt; Strong Bull</pre>
+    </section>
+
+    <section class="card" id="s5">
+      <h2>5. Markov matica</h2>
+      <p>Markov matica ukazuje, ako často jeden stav prechádza do druhého.</p>
+      <pre>P[i][j] = počet prechodov zo stavu i do stavu j / celkový počet prechodov zo stavu i</pre>
+      <p>
+        <code>i</code> je aktuálny stav a <code>j</code> je nasledujúci stav.
+      </p>
+    </section>
+
+    <section class="card" id="s6">
+      <h2>6. Aktuálny Markov stav</h2>
+      <p>Aktuálny stav sa počíta z posledných 20 klasifikovaných dní.</p>
+      <pre>currentState = round(average(last 20 states))</pre>
+      <p>
+        Ak bolo posledných 20 dní prevažne rastových, aktuálny stav bude bližšie k Bull alebo Strong Bull.
+      </p>
+    </section>
+
+    <section class="card" id="s7">
+      <h2>7. Markov Signal</h2>
+      <p>Z aktuálneho riadku Markov matice sa vypočítajú pravdepodobnosti poklesu, neutrality a rastu.</p>
+      <pre>down    = P[current][0] + P[current][1]
+neutral = P[current][2]
+up      = P[current][3] + P[current][4]</pre>
+
+      <p>Logika signálu:</p>
+      <pre>ak up &gt; down a up &gt; 0.52      =&gt; BUY
+ak down &gt; up a down &gt; 0.52    =&gt; SELL
+inak                          =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s8">
+      <h2>8. Trend Model</h2>
+      <p>Trendový model sleduje zmenu ceny za 20 a 60 dní.</p>
+      <pre>trend20 = (close[now] - close[now-20]) / close[now-20]
+trend60 = (close[now] - close[now-60]) / close[now-60]</pre>
+
+      <p>Logika trendového signálu:</p>
+      <pre>ak trend20 &gt; 0.03 a trend60 &gt; 0.06       =&gt; BULLISH
+ak trend20 &lt; -0.03 a trend60 &lt; -0.06     =&gt; BEARISH
+inak                                      =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s9">
+      <h2>9. Combined Model</h2>
+      <p>Combined Model spája Markov model, trend a riziko do jedného skóre.</p>
+      <pre>score = 0
+score += (up - down) * 2.2
+score += (currentState - 2) * 0.35</pre>
+      <p>
+        Ak je pravdepodobnosť rastu vyššia ako pravdepodobnosť poklesu, skóre rastie.
+        Ak je aktuálny stav vyšší ako Neutral, skóre rastie.
+      </p>
+    </section>
+
+    <section class="card" id="s10">
+      <h2>10. Trendový príspevok do skóre</h2>
+      <pre>ak trend20 &gt; 0.03        score += 0.7
+inak ak trend20 &gt; 0.01   score += 0.35
+inak ak trend20 &lt; -0.03  score -= 0.7
+inak ak trend20 &lt; -0.01  score -= 0.35
+
+ak trend60 &gt; 0.06        score += 0.8
+inak ak trend60 &gt; 0.02   score += 0.4
+inak ak trend60 &lt; -0.06  score -= 0.8
+inak ak trend60 &lt; -0.02  score -= 0.4</pre>
+    </section>
+
+    <section class="card" id="s11">
+      <h2>11. Riziková úprava skóre</h2>
+      <p>Ak je riziko zvýšené, skóre sa zníži.</p>
+      <pre>ak crashRisk &gt; 0.12      score -= 0.4
+ak volatility &gt; 0.035    score -= 0.25</pre>
+    </section>
+
+    <section class="card" id="s12">
+      <h2>12. Combined Signal</h2>
+      <p>Kombinovaný signál sa určuje zo skóre.</p>
+      <pre>ak score &gt; 0.75    =&gt; BUY
+ak score &lt; -0.75   =&gt; SELL
+inak               =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s13">
+      <h2>13. Final Decision</h2>
+      <p>Final Decision je hlavný výsledok aplikácie. Vychádza z Combined Signal, ale zohľadňuje riziko.</p>
+      <pre>finalSignal = combinedSignal
+
+ak riskLevel == HIGH a finalSignal == BUY:
+    finalSignal = NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s14">
+      <h2>14. Risk Panel</h2>
+      <p>
+        Risk Panel hodnotí riziko pomocou dvoch metrík:
+        Crash Risk a Volatility.
+      </p>
+    </section>
+
+    <section class="card" id="s15">
+      <h2>15. Crash Risk</h2>
+      <p>Crash Risk meria, ako často bol denný výnos horší ako -2 %.</p>
+      <pre>crashRisk = počet dní, kde return &lt; -0.02 / celkový počet dní</pre>
+    </section>
+
+    <section class="card" id="s16">
+      <h2>16. Volatility</h2>
+      <p>Volatilita meria kolísavosť denných výnosov.</p>
+      <pre>avg = sum(return) / počet return
+
+volatility = sqrt( sum((return[t] - avg)^2) / počet return )</pre>
+    </section>
+
+    <section class="card" id="s17">
+      <h2>17. Risk Level</h2>
+      <p>Risk Level sa určuje podľa Crash Risk a volatility.</p>
+      <pre>ak crashRisk &gt; 0.14 alebo volatility &gt; 0.04   =&gt; HIGH
+ak crashRisk &gt; 0.08 alebo volatility &gt; 0.025  =&gt; MEDIUM
+inak                                           =&gt; LOW</pre>
+    </section>
+
+    <section class="card" id="s18">
+      <h2>18. Confidence</h2>
+      <p>Confidence vyjadruje silu modelového výstupu.</p>
+      <pre>markovConfidence = max(up, down, neutral)
+
+confidence = min(1, markovConfidence + abs(score) * 0.12)</pre>
+    </section>
+
+    <section class="card" id="s19">
+      <h2>19. Trend Strength</h2>
+      <p>Trend Strength meria silu trendu podľa 20D a 60D pohybu.</p>
+      <pre>trendStrength = min(1, abs(trend20) * 2.5 + abs(trend60) * 1.5)</pre>
+    </section>
+
+    <section class="card" id="s20">
+      <h2>20. Win Probability</h2>
+      <p>Win Probability znamená pravdepodobnosť prechodu do rastových Markov stavov.</p>
+      <pre>winProbability = up
+
+up = P[current][3] + P[current][4]</pre>
+    </section>
+
+    <section class="card" id="s21">
+      <h2>21. Monte Carlo simulácia</h2>
+      <p>
+        Monte Carlo simulácia odhaduje možné budúce výnosy pomocou historického priemeru a volatility.
+      </p>
+      <pre>simReturn = avg + volatility * random(-1, 1)
+
+simTotal = sum(simReturn for N days)</pre>
+      <p>
+        Model robí 700 simulácií pre 30, 90 a 252 dní.
+        Výstupy sú 5. percentil, medián a 95. percentil.
+      </p>
+    </section>
+
+    <section class="card" id="s22">
+      <h2>22. Price Chart</h2>
+      <p>
+        Price Chart zobrazuje historický vývoj zatváracích cien.
+        Graf nie je predikcia, zobrazuje iba historický pohyb ceny.
+      </p>
+    </section>
+
+    <section class="card" id="s23">
+      <h2>23. Markov Matrix</h2>
+      <p>
+        Markov Matrix je technický detail modelu.
+        Ukazuje pravdepodobnosti prechodov medzi stavmi Strong Bear, Bear, Neutral, Bull a Strong Bull.
+      </p>
+    </section>
+
+    <section class="card" id="s24">
+      <h2>24. Disclaimer</h2>
+      <p>
+        Tento model je iba edukačný analytický nástroj.
+        Výstupy BUY, SELL alebo NEUTRAL nie sú investičným odporúčaním.
+        Model používa historické dáta a zjednodušené štatistické pravidlá.
+        Historické správanie nemusí predpovedať budúci vývoj trhu.
+      </p>
+    </section>
+
+    <div class="footer">
+      Markov Quant Terminal — educational documentation.
+    </div>
+  </div>
+</body>
+</html>
