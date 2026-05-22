@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARKOV QUANT TERMINAL — User Guide</title>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #0b0f14;
+      --panel2: #111827;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --blue: #60a5fa;
+      --orange: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: monospace;
+      line-height: 1.62;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .nav a {
+      display: inline-block;
+      margin: 0 0 6px 6px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .nav a:hover {
+      background: #1f2937;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      color: var(--orange);
+      letter-spacing: 1px;
+    }
+
+    h2 {
+      margin: 24px 0 10px;
+      padding-bottom: 6px;
+      color: var(--blue);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 14px;
+      margin: 14px 0;
+    }
+
+    .notice {
+      border: 1px solid var(--orange);
+      background: #18110a;
+      padding: 12px;
+      margin: 14px 0;
+    }
+
+    code,
+    pre {
+      background: var(--panel2);
+      border: 1px solid #1f2937;
+      color: var(--text);
+    }
+
+    code {
+      padding: 2px 5px;
+    }
+
+    pre {
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    ol {
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    .footer {
+      margin-top: 30px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 12px;
+      }
+
+      .top {
+        display: block;
+      }
+
+      .nav a {
+        margin: 6px 6px 0 0;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>MARKOV QUANT TERMINAL — User Guide</h1>
+        <div class="muted">English manual version</div>
+      </div>
+
+      <div class="nav">
+        /Terminal</a>
+        /manual-SK.htmlSK</a>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>Disclaimer:</strong> This document explains an educational model. The model output is not financial advice.
+    </div>
+
+    <div class="card">
+      <h2>Contents</h2>
+      <ol>
+        <li>#s1Application Purpose</a></li>
+        <li>#s2Input Data</a></li>
+        <li>#s3Daily Return</a></li>
+        <li>#s4Markov States</a></li>
+        <li>#s5Markov Matrix</a></li>
+        <li>#s6Current Markov State</a></li>
+        <li>#s7Markov Signal</a></li>
+        <li>#s8Trend Model</a></li>
+        <li>#s9Combined Model</a></li>
+        <li>#s10Trend Contribution to Score</a></li>
+        <li>#s11Risk Adjustment</a></li>
+        <li>#s12Combined Signal</a></li>
+        <li>#s13Final Decision</a></li>
+        <li>#s14Risk Panel</a></li>
+        <li>#s15Crash Risk</a></li>
+        <li>#s16Volatility</a></li>
+        <li>#s17Risk Level</a></li>
+        <li>#s18Confidence</a></li>
+        <li>#s19Trend Strength</a></li>
+        <li>#s20Win Probability</a></li>
+        <li>#s21Monte Carlo Simulation</a></li>
+        <li>#s22Price Chart</a></li>
+        <li>#s23Markov Matrix</a></li>
+        <li>#s24Disclaimer</a></li>
+      </ol>
+    </div>
+
+    <section class="card" id="s1">
+      <h2>1. Application Purpose</h2>
+      <p>
+        Markov Quant Terminal is an educational analytical tool that uses historical daily stock prices
+        to estimate market state, trend, risk, and possible price direction.
+        The model combines a Markov model, trend model, combined score, risk panel,
+        Monte Carlo simulation, and price chart.
+      </p>
+    </section>
+
+    <section class="card" id="s2">
+      <h2>2. Input Data</h2>
+      <p>
+        The application uses daily closing prices.
+        The variable <code>close[t]</code> means the closing price on day <code>t</code>.
+      </p>
+    </section>
+
+    <section class="card" id="s3">
+      <h2>3. Daily Return</h2>
+      <p>Closing prices are converted into daily percentage returns.</p>
+      <pre>return[t] = (close[t] - close[t-1]) / close[t-1]</pre>
+      <p>If yesterday's price was 100 and today's price is 103:</p>
+      <pre>(103 - 100) / 100 = 0.03 = 3 %</pre>
+    </section>
+
+    <section class="card" id="s4">
+      <h2>4. Markov States</h2>
+      <p>Daily returns are divided into five states:</p>
+      <pre>0 = Strong Bear
+1 = Bear
+2 = Neutral
+3 = Bull
+4 = Strong Bull</pre>
+
+      <p>The model uses historical return quantiles:</p>
+      <pre>q15 = 15th percentile
+q40 = 40th percentile
+q60 = 60th percentile
+q85 = 85th percentile</pre>
+
+      <p>Return classification:</p>
+      <pre>if return &lt; q15  =&gt; Strong Bear
+if return &lt; q40  =&gt; Bear
+if return &lt; q60  =&gt; Neutral
+if return &lt; q85  =&gt; Bull
+else              =&gt; Strong Bull</pre>
+    </section>
+
+    <section class="card" id="s5">
+      <h2>5. Markov Matrix</h2>
+      <p>The Markov matrix shows how often one state transitions into another state.</p>
+      <pre>P[i][j] = number of transitions from state i to state j / total number of transitions from state i</pre>
+      <p>
+        <code>i</code> is the current state and <code>j</code> is the next state.
+      </p>
+    </section>
+
+    <section class="card" id="s6">
+      <h2>6. Current Markov State</h2>
+      <p>The current state is calculated from the last 20 classified days.</p>
+      <pre>currentState = round(average(last 20 states))</pre>
+      <p>
+        If the last 20 days were mostly bullish, the current state will be closer to Bull or Strong Bull.
+      </p>
+    </section>
+
+    <section class="card" id="s7">
+      <h2>7. Markov Signal</h2>
+      <p>The current row of the Markov matrix is used to calculate down, neutral, and up probabilities.</p>
+      <pre>down    = P[current][0] + P[current][1]
+neutral = P[current][2]
+up      = P[current][3] + P[current][4]</pre>
+
+      <p>Signal logic:</p>
+      <pre>if up &gt; down and up &gt; 0.52      =&gt; BUY
+if down &gt; up and down &gt; 0.52    =&gt; SELL
+else                             =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s8">
+      <h2>8. Trend Model</h2>
+      <p>The trend model measures price change over 20 and 60 days.</p>
+      <pre>trend20 = (close[now] - close[now-20]) / close[now-20]
+trend60 = (close[now] - close[now-60]) / close[now-60]</pre>
+
+      <p>Trend signal logic:</p>
+      <pre>if trend20 &gt; 0.03 and trend60 &gt; 0.06       =&gt; BULLISH
+if trend20 &lt; -0.03 and trend60 &lt; -0.06     =&gt; BEARISH
+else                                        =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s9">
+      <h2>9. Combined Model</h2>
+      <p>The Combined Model merges the Markov model, trend, and risk into one score.</p>
+      <pre>score = 0
+score += (up - down) * 2.2
+score += (currentState - 2) * 0.35</pre>
+      <p>
+        If the upward probability is higher than the downward probability, the score increases.
+        If the current state is above Neutral, the score also increases.
+      </p>
+    </section>
+
+    <section class="card" id="s10">
+      <h2>10. Trend Contribution to Score</h2>
+      <pre>if trend20 &gt; 0.03        score += 0.7
+else if trend20 &gt; 0.01   score += 0.35
+else if trend20 &lt; -0.03  score -= 0.7
+else if trend20 &lt; -0.01  score -= 0.35
+
+if trend60 &gt; 0.06        score += 0.8
+else if trend60 &gt; 0.02   score += 0.4
+else if trend60 &lt; -0.06  score -= 0.8
+else if trend60 &lt; -0.02  score -= 0.4</pre>
+    </section>
+
+    <section class="card" id="s11">
+      <h2>11. Risk Adjustment</h2>
+      <p>If risk is elevated, the score is reduced.</p>
+      <pre>if crashRisk &gt; 0.12      score -= 0.4
+if volatility &gt; 0.035    score -= 0.25</pre>
+    </section>
+
+    <section class="card" id="s12">
+      <h2>12. Combined Signal</h2>
+      <p>The combined signal is determined from the score.</p>
+      <pre>if score &gt; 0.75    =&gt; BUY
+if score &lt; -0.75   =&gt; SELL
+else               =&gt; NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s13">
+      <h2>13. Final Decision</h2>
+      <p>Final Decision is the main output of the application. It is based on the Combined Signal and adjusted for risk.</p>
+      <pre>finalSignal = combinedSignal
+
+if riskLevel == HIGH and finalSignal == BUY:
+    finalSignal = NEUTRAL</pre>
+    </section>
+
+    <section class="card" id="s14">
+      <h2>14. Risk Panel</h2>
+      <p>
+        The Risk Panel evaluates risk using two metrics:
+        Crash Risk and Volatility.
+      </p>
+    </section>
+
+    <section class="card" id="s15">
+      <h2>15. Crash Risk</h2>
+      <p>Crash Risk measures how often the daily return was below -2 %.</p>
+      <pre>crashRisk = number of days where return &lt; -0.02 / total number of days</pre>
+    </section>
+
+    <section class="card" id="s16">
+      <h2>16. Volatility</h2>
+      <p>Volatility measures variability of daily returns.</p>
+      <pre>avg = sum(return) / number of returns
+
+volatility = sqrt( sum((return[t] - avg)^2) / number of returns )</pre>
+    </section>
+
+    <section class="card" id="s17">
+      <h2>17. Risk Level</h2>
+      <p>Risk Level is determined using Crash Risk and volatility.</p>
+      <pre>if crashRisk &gt; 0.14 or volatility &gt; 0.04   =&gt; HIGH
+if crashRisk &gt; 0.08 or volatility &gt; 0.025  =&gt; MEDIUM
+else                                        =&gt; LOW</pre>
+    </section>
+
+    <section class="card" id="s18">
+      <h2>18. Confidence</h2>
+      <p>Confidence expresses the strength of the model output.</p>
+      <pre>markovConfidence = max(up, down, neutral)
+
+confidence = min(1, markovConfidence + abs(score) * 0.12)</pre>
+    </section>
+
+    <section class="card" id="s19">
+      <h2>19. Trend Strength</h2>
+      <p>Trend Strength measures trend intensity using 20D and 60D movement.</p>
+      <pre>trendStrength = min(1, abs(trend20) * 2.5 + abs(trend60) * 1.5)</pre>
+    </section>
+
+    <section class="card" id="s20">
+      <h2>20. Win Probability</h2>
+      <p>Win Probability means the probability of transitioning into bullish Markov states.</p>
+      <pre>winProbability = up
+
+up = P[current][3] + P[current][4]</pre>
+    </section>
+
+    <section class="card" id="s21">
+      <h2>21. Monte Carlo Simulation</h2>
+      <p>
+        Monte Carlo simulation estimates possible future returns using historical average return and volatility.
+      </p>
+      <pre>simReturn = avg + volatility * random(-1, 1)
+
+simTotal = sum(simReturn for N days)</pre>
+      <p>
+        The model runs 700 simulations for 30, 90, and 252 days.
+        Outputs are the 5th percentile, median, and 95th percentile.
+      </p>
+    </section>
+
+    <section class="card" id="s22">
+      <h2>22. Price Chart</h2>
+      <p>
+        The Price Chart shows historical closing prices.
+        The chart is not a prediction. It only displays historical price movement.
+      </p>
+    </section>
+
+    <section class="card" id="s23">
+      <h2>23. Markov Matrix</h2>
+      <p>
+        The Markov Matrix is a technical detail of the model.
+        It shows transition probabilities between Strong Bear, Bear, Neutral, Bull, and Strong Bull states.
+      </p>
+    </section>
+
+    <section class="card" id="s24">
+      <h2>24. Disclaimer</h2>
+      <p>
+        This model is an educational analytical tool only.
+        Outputs such as BUY, SELL, or NEUTRAL are not investment advice.
+        The model uses historical data and simplified statistical rules.
+        Historical behavior may not predict future market performance.
+      </p>
+    </section>
+
+    <div class="footer">
+      Markov Quant Terminal — educational documentation.
+    </div>
+  </div>
+</body>
+</html>
