@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markov Quant</title>
+./style.css
+</head>
+
+<body>
+
+<h2>📊 MARKOV QUANT TERMINAL</h2>
+
+<div class="topbar">
+  <input id="ticker" value="AAPL">
+  <button onclick="run()">RUN</button>
+</div>
+
+<div id="out"></div>
+
+<script>
+const STATES = ["Strong Bear","Bear","Neutral","Bull","Strong Bull"];
+
+function buildClassifier(ret){
+  let sorted = [...ret].sort((a,b)=>a-b);
+
+  let q15 = sorted[Math.floor(sorted.length * 0.15)];
+  let q40 = sorted[Math.floor(sorted.length * 0.40)];
+  let q60 = sorted[Math.floor(sorted.length * 0.60)];
+  let q85 = sorted[Math.floor(sorted.length * 0.85)];
+
+  return function(r){
+    if(r < q15) return 0;
+    if(r < q40) return 1;
+    if(r < q60) return 2;
+    if(r < q85) return 3;
+    return 4;
+  };
+}
+
+function buildMatrix(seq){
+  let m = Array.from({length:5},()=>Array(5).fill(0));
+
+  for(let i=0;i<seq.length-1;i++){
+    m[seq[i]][seq[i+1]]++;
+  }
+
+  return m.map(r=>{
+    let s = r.reduce((a,b)=>a+b,0);
+    return s ? r.map(v=>v/s) : Array(5).fill(0.2);
+  });
+}
+
+function monte(avg, vol, days){
+  let r = [];
+
+  for(let i=0;i<500;i++){
+    let val = 0;
+
+    for(let d=0;d<days;d++){
+      val += avg + vol * (Math.random() - 0.5) * 2;
+    }
+
+    r.push(val);
+  }
+
+  r.sort((a,b)=>a-b);
+
+  return {
+    worst: r[Math.floor(r.length * 0.05)],
+    median: r[Math.floor(r.length * 0.50)],
+    best: r[Math.floor(r.length * 0.95)]
+  };
+}
+
+function drawChart(canvas, prices){
+  let ctx = canvas.getContext("2d");
+
+  let w = canvas.width = canvas.clientWidth;
+  let h = canvas.height = canvas.clientHeight;
+
+  ctx.clearRect(0,0,w,h);
+
+  let clean = prices.filter(v => typeof v === "number" && isFinite(v));
+
+  if(clean.length < 2){
+    ctx.fillStyle = "#888";
+    ctx.fillText("No chart data", 10, 20);
+    return;
+  }
+
+  let min = Math.min(...clean);
+  let max = Math.max(...clean);
+  let range = max - min || 1;
+
+  ctx.beginPath();
+  ctx.strokeStyle = "#22c55e";
+  ctx.lineWidth = 2;
+
+  clean.forEach((p,i)=>{
+    let x = i / (clean.length - 1) * w;
+    let y = h - ((p - min) / range) * h;
+
+    if(i === 0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+
+  ctx.stroke();
+}
+
+function colorState(state){
+  if(state.includes("Bull")) return `<span class="green">${state}</span>`;
+  if(state.includes("Bear")) return `<span class="red">${state}</span>`;
+  return `<span class="yellow">${state}</span>`;
+}
+
+function colorSignal(signal){
+  if(signal === "BUY") return `<span class="green">BUY</span>`;
+  if(signal === "SELL") return `<span class="red">SELL</span>`;
+  return `<span class="yellow">NEUTRAL</span>`;
+}
+
+function getTrend(close, days){
+  if(close.length <= days) return 0;
+
+  let now = close[close.length - 1];
+  let past = close[close.length - 1 - days];
+
+  if(!past) return 0;
+
+  return (now - past) / past;
+}
+
+function trendLabel(value){
+  if(value > 0.75) return `<span class="green">Bullish</span>`;
+  if(value < -0.75) return `<span class="red">Bearish</span>`;
+  return `<span class="yellow">Neutral</span>`;
+}
+
+async function run(){
+  const t = document.getElementById("ticker").value.trim();
+  const out = document.getElementById("out");
+
+  if(!t){
+    out.innerHTML = "❌ Enter ticker";
+    return;
+  }
+
+  out.innerHTML = "Loading...";
+
+  try{
+    const res = await fetch("/api/data?t=" + encodeURIComponent(t) + "&_=" + Date.now());
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      out.innerHTML = "❌ Data error";
+      return;
+    }
+
+    const close = (data.close || []).filter(v => typeof v === "number" && isFinite(v));
+    const name = data.name || t;
+    const exchange = data.exchange || "Unknown";
+
+    if(close.length < 40){
+      out.innerHTML = "❌ Not enough price data";
+      return;
+    }
+
+    let ret = [];
+
+    for(let i=1;i<close.length;i++){
+      if(close[i] && close[i-1]){
+        ret.push((close[i] - close[i-1]) / close[i-1]);
+      }
+    }
+
+    if(ret.length < 30){
+      out.innerHTML = "❌ Not enough return data";
+      return;
+    }
+
+    const classify = buildClassifier(ret);
+    const seq = ret.map(classify);
+    const P = buildMatrix(seq);
+
+    const recent = seq.slice(-20);
+    const avgState = recent.reduce((a,b)=>a+b,0) / recent.length;
+    const current = Math.round(avgState);
+
+    let avg = ret.reduce((a,b)=>a+b,0) / ret.length;
+
+    let vol = Math.sqrt(
+      ret.reduce((a,b)=>a + Math.pow(b - avg, 2), 0) / ret.length
+    );
+
+    let crash = ret.filter(x => x < -0.02).length / ret.length;
+
+    const mc30 = monte(avg, vol, 30);
+    const mc90 = monte(avg, vol, 90);
+    const mc252 = monte(avg, vol, 252);
+
+    let row = P[current];
+
+    let down = row[0] + row[1];
+    let neutral = row[2];
+    let up = row[3] + row[4];
+
+    let trend20 = getTrend(close, 20);
+    let trend60 = getTrend(close, 60);
+
+    let markovSignal = "NEUTRAL";
+
+    if(up > down && up > 0.52) markovSignal = "BUY";
+    if(down > up && down > 0.52) markovSignal = "SELL";
+
+    let markovConfidence = Math.max(up, down, neutral);
+    let markovSignalHTML = colorSignal(markovSignal);
+
+    let score = 0;
+
+    score += (up - down) * 2;
+    score += (current - 2) * 0.35;
+
+    let trendScore = 0;
+
+    if(trend20 > 0.03) trendScore += 0.7;
+    else if(trend20 > 0.01) trendScore += 0.35;
+    else if(trend20 < -0.03) trendScore -= 0.7;
+    else if(trend20 < -0.01) trendScore -= 0.35;
+
+    if(trend60 > 0.06) trendScore += 0.7;
+    else if(trend60 > 0.02) trendScore += 0.35;
+    else if(trend60 < -0.06) trendScore -= 0.7;
+    else if(trend60 < -0.02) trendScore -= 0.35;
+
+    score += trendScore;
+
+    if(mc30.median > 0.01) score += 0.35;
+    if(mc30.median < -0.01) score -= 0.35;
+
+    if(crash > 0.12) score -= 0.5;
+    if(crash > 0.18) score -= 0.8;
+
+    let combinedSignal = "NEUTRAL";
+
+    if(score >= 1.0) combinedSignal = "BUY";
+    if(score <= -1.0) combinedSignal = "SELL";
+
+    let combinedSignalHTML = colorSignal(combinedSignal);
+
+    let confidence = Math.min(0.99, Math.abs(score) / 2.5);
+
+    if(combinedSignal === "NEUTRAL"){
+      confidence = Math.max(0.45, Math.min(0.65, confidence));
+    }
+
+    let strength = Math.min(1, Math.abs(score) / 2);
+
+    let winrate = up / (up + down || 1);
+    winrate = (winrate * 0.6 + (mc30.median > 0 ? 0.65 : 0.35) * 0.4) * 100;
+
+    let matrixHTML = "<div class='grid'>";
+
+    P.forEach(r=>{
+      r.forEach(v=>{
+        matrixHTML += `<div class="cell">${(v*100).toFixed(0)}%</div>`;
+      });
+    });
+
+    matrixHTML += "</div>";
+
+    out.innerHTML = `
+      <div class="box company-box">
+        <div class="title">Company</div>
+        ${name} (${t.toUpperCase()})<br>
+        Exchange: ${exchange}
+      </div>
+
+      <div class="section markov-section">
+        <div class="section-title">MARKOV ANALYSIS</div>
+
+        <div class="box">
+          <div class="title">State</div>
+          ${colorState(STATES[current])}
+        </div>
+
+        <div class="box">
+          <div class="title">Markov Signal</div>
+          ${markovSignalHTML}<br>
+          Confidence: ${(markovConfidence*100).toFixed(1)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Markov Matrix</div>
+          ${matrixHTML}
+        </div>
+      </div>
+
+      <div class="section combined-section">
+        <div class="section-title">COMBINED ANALYSIS</div>
+
+        <div class="box">
+          <div class="title">Combined Signal</div>
+          ${combinedSignalHTML}
+        </div>
+
+        <div class="box">
+          <div class="title">Signal Score</div>
+          ${score.toFixed(2)}
+        </div>
+
+        <div class="box">
+          <div class="title">Confidence</div>
+          ${(confidence*100).toFixed(1)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Signal Strength</div>
+          ${(strength*100).toFixed(1)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Win Probability</div>
+          ${winrate.toFixed(1)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Crash Risk</div>
+          ${(crash*100).toFixed(1)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Classic Trend</div>
+          20d: ${(trend20*100).toFixed(2)}%<br>
+          60d: ${(trend60*100).toFixed(2)}%
+        </div>
+
+        <div class="box">
+          <div class="title">Combined Trend</div>
+          ${trendLabel(trendScore)}<br>
+          Trend Score: ${trendScore.toFixed(2)}
+        </div>
+
+        <div class="box">
+          <div class="title">Monte Carlo</div>
+          30d: W ${mc30.worst.toFixed(2)} → M ${mc30.median.toFixed(2)} → B ${mc30.best.toFixed(2)}<br>
+          90d: W ${mc90.worst.toFixed(2)} → M ${mc90.median.toFixed(2)} → B ${mc90.best.toFixed(2)}<br>
+          1y: W ${mc252.worst.toFixed(2)} → M ${mc252.median.toFixed(2)} → B ${mc252.best.toFixed(2)}
+        </div>
+      </div>
+
+      <div class="section price-section">
+        <div class="section-title">PRICE</div>
+
+        <div class="box">
+          <div class="title">Price Chart</div>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+    `;
+
+    setTimeout(()=>{
+      drawChart(document.getElementById("chart"), close.slice(-120));
+    },10);
+
+  } catch(e){
+    out.innerHTML = "❌ error";
+  }
+}
+</script>
+
+</body>
+</html>
