@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width">
+<title>Markov Quant</title>
+
+<style>
+body { background:#0d1117; color:white; font-family:monospace; padding:15px; }
+input,button { padding:10px; margin:5px; }
+.bar { width:2px; background:#22c55e; }
+.grid { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; }
+.cell { padding:6px; text-align:center; font-size:12px; }
+.box { margin-top:10px; padding:10px; border:1px solid #333; }
+.title { color:#f59e0b; }
+</style>
+
+</head>
+
+<body>
+
+<h2>📊 MARKOV QUANT TERMINAL</h2>
+
+<input id="ticker" value="AAPL">
+<button onclick="run()">RUN</button>
+
+<div id="out"></div>
+
+<script>
+
+const STATES = [
+  "Strong Bear (silný pokles)",
+  "Bear (pokles)",
+  "Neutral (bez pohybu)",
+  "Bull (rast)",
+  "Strong Bull (silný rast)"
+];
+
+const TH = [-0.015, -0.003, 0.003, 0.015];
+
+// klasifikácia
+function classify(r){
+  if(r < TH[0]) return 0;
+  if(r < TH[1]) return 1;
+  if(r < TH[2]) return 2;
+  if(r < TH[3]) return 3;
+  return 4;
+}
+
+// matrix
+function buildMatrix(seq){
+  let m = Array.from({length:5},()=>Array(5).fill(0));
+
+  for(let i=0;i<seq.length-1;i++){
+    m[seq[i]][seq[i+1]]++;
+  }
+
+  return m.map(row=>{
+    let s=row.reduce((a,b)=>a+b,0);
+    return s ? row.map(v=>v/s) : Array(5).fill(0.2);
+  });
+}
+
+// monte carlo
+function monteCarlo(avg, vol, days){
+  let results = [];
+
+  for(let i=0;i<2000;i++){
+    let value=0;
+
+    for(let d=0;d<days;d++){
+      let r = avg + vol * (Math.random());
+      value += r;
+    }
+
+    results.push(value);
+  }
+
+  results.sort((a,b)=>a-b);
+
+  return {
+    worst: results[Math.floor(results.length*0.05)],
+    median: results[Math.floor(results.length*0.5)],
+    best: results[Math.floor(results.length*0.95)]
+  };
+}
+
+async function run(){
+
+  const out = document.getElementById("out");
+  const t = document.getElementById("ticker").value;
+
+  out.innerHTML = "⏳ Loading...";
+
+  try{
+    const res = await fetch("/api/data?t="+t);
+    const close = await res.json();
+
+    let returns=[];
+    for(let i=1;i<close.length;i++){
+      returns.push((close[i]-close[i-1])/close[i-1]);
+    }
+
+    const seq = returns.map(classify);
+    const P = buildMatrix(seq);
+    const current = seq[seq.length-1];
+
+    let avg = returns.reduce((a,b)=>a+b,0)/returns.length;
+
+    // volatilita
+    let vol = Math.sqrt(returns.map(x=>x*x).reduce((a,b)=>a+b,0)/returns.length);
+
+    // crash risk
+    let crash = returns.filter(r=>r<-0.02).length/returns.length;
+
+    // monte carlo
+    const mc30 = monteCarlo(avg, vol, 30);
+    const mc90 = monteCarlo(avg, vol, 90);
+    const mc252 = monteCarlo(avg, vol, 252);
+
+    // signal
+    let signal =
+      avg > 0.001 ? "🟢 BUY" :
+      avg < -0.001 ? "🔴 SELL" :
+      "⚪ NEUTRAL";
+
+    // interpretácia
+    let interpretation = avg > 0 ? "Trh má bullish bias" : "Trh má bearish bias";
+
+    // graf
+    let graph="<div style='display:flex'>";
+    close.slice(-100).forEach(p=>{
+      graph+=`<div class="bar" style="height:${p*0.4}px"></div>`;
+    });
+    graph+="</div>";
+
+    // matrix
+    let matrixHTML="<div class='grid'>";
+    P.forEach(row=>{
+      row.forEach(v=>{
+        matrixHTML+=`<div class="cell" style="background:rgba(245,158,11,${v})">${(v*100).toFixed(0)}%</div>`;
+      });
+    });
+    matrixHTML+="</div>";
+
+    out.innerHTML = `
+      
+      <div class="box">
+        <div class="title">📍 Aktuálny stav trhu</div>
+        <h3>${STATES[current]}</h3>
+        <p>${signal}</p>
+      </div>
+
+      <div class="box">
+        <div class="title">🧠 Interpretácia</div>
+        ${interpretation}
+      </div>
+
+      <div class="box">
+        <div class="title">📉 Crash risk</div>
+        ${(crash*100).toFixed(1)}% dní má veľký pokles
+      </div>
+
+      <div class="box">
+        <div class="title">🎲 Monte Carlo predikcia</div>
+        <p>30 dní: ${mc30.worst.toFixed(2)} → ${mc30.median.toFixed(2)} → ${mc30.best.toFixed(2)}</p>
+        <p>90 dní: ${mc90.worst.toFixed(2)} → ${mc90.median.toFixed(2)} → ${mc90.best.toFixed(2)}</p>
+        <p>1 rok: ${mc252.worst.toFixed(2)} → ${mc252.median.toFixed(2)} → ${mc252.best.toFixed(2)}</p>
+      </div>
+
+      <div class="box">
+        <div class="title">📊 Transition matrix</div>
+        ${matrixHTML}
+      </div>
+
+      <div class="box">
+        <div class="title">📈 Cena</div>
+        ${graph}
+      </div>
+    `;
+
+  }catch(e){
+    out.innerHTML = "❌ Error";
+  }
+}
+
+</script>
+
+</body>
+</html>
