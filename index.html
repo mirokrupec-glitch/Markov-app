@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markov Quant</title>
+
+<style>
+body {
+  background:#0d1117;
+  color:white;
+  font-family:monospace;
+  padding:15px;
+}
+input,button {
+  padding:10px;
+  margin:5px;
+}
+.bar {
+  width:2px;
+  background:#22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📊 MARKOV TERMINAL (LIVE)</h2>
+
+<input id="ticker" value="AAPL">
+<button onclick="run()">RUN</button>
+
+<div id="out"></div>
+
+<script>
+
+function fetchCSV(url) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    const callbackName = "cb_" + Math.random().toString(36).substring(2);
+
+    window[callbackName] = function(data) {
+      resolve(data);
+      document.body.removeChild(script);
+      delete window[callbackName];
+    };
+
+    script.src = "https://jsonp.afeld.me/?callback=" + callbackName + "&url=" + encodeURIComponent(url);
+    script.onerror = reject;
+
+    document.body.appendChild(script);
+  });
+}
+
+async function run() {
+  const out = document.getElementById("out");
+  const ticker = document.getElementById("ticker").value.toLowerCase();
+
+  out.innerHTML = "⏳ Loading live data...";
+
+  try {
+    const url = "https://stooq.com/q/d/l/?s=" + ticker + "&i=d";
+
+    const csvText = await fetchCSV(url);
+
+    const rows = csvText.split("\\n").slice(1);
+
+    let close = [];
+
+    rows.forEach(r => {
+      const cols = r.split(",");
+      if (cols[4] && !isNaN(cols[4])) {
+        close.push(parseFloat(cols[4]));
+      }
+    });
+
+    if (close.length < 20) {
+      out.innerHTML = "❌ Málo dát alebo zlý ticker";
+      return;
+    }
+
+    let returns = [];
+    for (let i = 1; i < close.length; i++) {
+      returns.push((close[i] - close[i-1]) / close[i-1]);
+    }
+
+    let avg = returns.reduce((a,b)=>a+b,0) / returns.length;
+    let crash = returns.filter(r=>r < -0.02).length / returns.length;
+
+    let signal =
+      avg > 0.001 ? "🟢 BUY" :
+      avg < -0.001 ? "🔴 SELL" :
+      "⚪ NEUTRAL";
+
+    // graf
+    let graph = "<div style='display:flex;gap:1px;margin-top:10px'>";
+    close.slice(-100).forEach(p=>{
+      graph += `<div class="bar" style="height:${p*0.4}px"></div>`;
+    });
+    graph += "</div>";
+
+    out.innerHTML = `
+      <h3>${signal}</h3>
+      <p>Crash risk: ${(crash*100).toFixed(1)}%</p>
+      ${graph}
+    `;
+
+  } catch (e) {
+    console.log(e);
+    out.innerHTML = "❌ Nepodarilo sa načítať live dáta";
+  }
+}
+
+</script>
+
+</body>
+</html>
