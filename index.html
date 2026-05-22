@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markov Quant</title>
+
+<style>
+body {
+  background:#0d1117;
+  color:white;
+  font-family:monospace;
+  padding:15px;
+}
+input,button {
+  padding:10px;
+  margin:5px;
+}
+.bar {
+  width:2px;
+  background:#22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📊 MARKOV TERMINAL</h2>
+
+<input id="ticker" value="AAPL">
+<button id="runBtn">RUN</button>
+
+<div id="out"></div>
+
+<script>
+document.getElementById("runBtn").onclick = run;
+
+async function run() {
+  const out = document.getElementById("out");
+  const ticker = document.getElementById("ticker").value;
+
+  out.innerHTML = "⏳ Loading...";
+
+  try {
+    // ✅ FIX: použitie proxy proti blokovaniu Yahoo
+    const url = "https://query1.finance.yahoo.com/v8/finance/chart/" + ticker;
+
+    const res = await fetch(
+      "https://api.allorigins.win/raw?url=" + encodeURIComponent(url)
+    );
+
+    const data = await res.json();
+
+    if (!data.chart || !data.chart.result) {
+      out.innerHTML = "❌ Zlý ticker alebo Yahoo blokuje";
+      return;
+    }
+
+    const close = data.chart.result[0].indicators.quote[0].close;
+
+    let returns = [];
+    for (let i = 1; i < close.length; i++) {
+      if (close[i] && close[i - 1]) {
+        returns.push((close[i] - close[i - 1]) / close[i - 1]);
+      }
+    }
+
+    let avg = returns.reduce((a,b)=>a+b,0) / returns.length;
+    let crash = returns.filter(r=>r<-0.02).length / returns.length;
+
+    let signal =
+      avg > 0.001 ? "🟢 BUY" :
+      avg < -0.001 ? "🔴 SELL" :
+      "⚪ NEUTRAL";
+
+    // 📊 graf
+    let graph = "<div style='display:flex;gap:1px;margin-top:10px'>";
+    close.slice(-100).forEach(p=>{
+      if(p){
+        graph += `<div class="bar" style="height:${p*0.4}px"></div>`;
+      }
+    });
+    graph += "</div>";
+
+    out.innerHTML = `
+      <h3>${signal}</h3>
+      <p>Crash risk: ${(crash*100).toFixed(1)}%</p>
+      ${graph}
+    `;
+  }
+  catch (e) {
+    out.innerHTML = "❌ Fetch error (proxy nedostupný)";
+  }
+}
+</script>
+
+</body>
+</html>
