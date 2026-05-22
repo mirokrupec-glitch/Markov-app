@@ -1,0 +1,53 @@
+aaa
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Markov Quant</title>
+  <style>
+    body {background:#0d1117;color:white;font-family:monospace;padding:15px;}
+    input,button {padding:10px;margin:5px;}
+  </style>
+</head>
+<body>
+
+<h2>📊 MARKOV QUANT TERMINAL</h2>
+
+<input id="ticker" value="AAPL">
+<button onclick="run()">RUN</button>
+
+<div id="out"></div>
+
+<script>
+async function run(){
+  const t = document.getElementById("ticker").value;
+
+  const res = await fetch(
+    "https://query1.finance.yahoo.com/v8/finance/chart/" + t
+  );
+  const j = await res.json();
+
+  let close = j.chart.result[0].indicators.quote[0].close;
+
+  let ret=[];
+  for(let i=1;i<close.length;i++){
+    if(close[i] && close[i-1])
+      ret.push((close[i]-close[i-1])/close[i-1]);
+  }
+
+  let avg = ret.reduce((a,b)=>a+b,0)/ret.length;
+  let crash = ret.filter(x=>x<-0.02).length/ret.length;
+
+  let signal =
+    avg>0.001?"🟢 BUY":
+    avg<-0.001?"🔴 SELL":
+    "⚪ NEUTRAL";
+
+  document.getElementById("out").innerHTML =
+    "<h3>"+signal+"</h3>" +
+    "<p>Crash prob: "+(crash*100).toFixed(1)+"%</p>";
+}
+</script>
+
+</body>
+</html>
